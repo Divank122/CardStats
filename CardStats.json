@@ -1,0 +1,10 @@
+{
+    "id": "CardStats",
+    "name": "Card Stats Tracker",
+    "author": "Divank",
+    "description": "Tracks how many times each card has been played during the run. View stats in the deck view screen.",
+    "version": "1.0.1",
+    "has_pck": false,
+    "has_dll": true,
+    "affects_gameplay": true
+}
