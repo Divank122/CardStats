@@ -1,6 +1,7 @@
 using CardStats.Scripts;
 using Godot;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Nodes.Cards;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Screens;
@@ -171,8 +172,6 @@ public partial class CardStatsLabel : Control
     private bool _initialized = false;
     private readonly FontVariation? _cachedFont;
     private bool _lastVisibleState = true;
-    private bool _usePileVisibility = false;
-    private bool _visibilityModeDetermined = false;
 
     private CardStatsLabel(FontVariation? font)
     {
@@ -181,9 +180,6 @@ public partial class CardStatsLabel : Control
 
     public override void _Ready()
     {
-        _usePileVisibility = IsInPileScreen();
-        _visibilityModeDetermined = true;
-        
         _label = new MegaLabel();
         _label.Name = "StatsLabel";
         _label.Text = $"打出:{_pendingCount}";
@@ -208,7 +204,7 @@ public partial class CardStatsLabel : Control
 
     public override void _Process(double delta)
     {
-        if (!_visibilityModeDetermined) return;
+        if (!_initialized) return;
         
         var currentVisibility = GetCurrentVisibility();
         if (currentVisibility != _lastVisibleState)
@@ -220,7 +216,7 @@ public partial class CardStatsLabel : Control
 
     private bool GetCurrentVisibility()
     {
-        return _usePileVisibility ? CardPlayStats.ShowPilePlayCount : CardPlayStats.ShowPlayCount;
+        return IsInPileScreen() ? CardPlayStats.ShowPilePlayCount : CardPlayStats.ShowPlayCount;
     }
 
     private bool IsInPileScreen()

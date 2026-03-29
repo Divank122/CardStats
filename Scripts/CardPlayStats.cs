@@ -13,6 +13,8 @@ public static class CardPlayStats
 {
     private static Dictionary<string, int> _playCounts = new();
     private static Dictionary<string, int>? _combatBackup = null;
+    private static Dictionary<CardModel, (string key, int count)> _pendingUpgrades = new();
+    private static Dictionary<CardModel, int> _pendingRemoval = new();
     
     public static bool ShowPlayCount { get; set; } = true;
     public static bool ShowPilePlayCount { get; set; } = true;
@@ -47,28 +49,29 @@ public static class CardPlayStats
         return state?.Players?.FirstOrDefault()?.Deck?.Cards;
     }
 
-    private static string GetCardKey(CardModel? deckCard)
+    public static string GetCardKey(CardModel? deckCard)
     {
         if (deckCard == null)
         {
             return $"unknown{Separator}0";
         }
         
+        var actualCard = deckCard.DeckVersion ?? deckCard;
         var deck = GetDeck();
         if (deck == null)
         {
-            return $"{deckCard.Id}{Separator}{deckCard.IsUpgraded}{Separator}{deckCard.FloorAddedToDeck ?? 0}{Separator}0";
+            return $"{actualCard.Id}{Separator}{actualCard.IsUpgraded}{Separator}{actualCard.FloorAddedToDeck ?? 0}{Separator}0";
         }
         
-        var id = deckCard.Id.ToString();
-        var isUpgraded = deckCard.IsUpgraded;
-        var floor = deckCard.FloorAddedToDeck ?? 0;
+        var id = actualCard.Id.ToString();
+        var isUpgraded = actualCard.IsUpgraded;
+        var floor = actualCard.FloorAddedToDeck ?? 0;
         
         int index = 0;
         for (int i = 0; i < deck.Count; i++)
         {
             var c = deck[i];
-            if (ReferenceEquals(c, deckCard))
+            if (ReferenceEquals(c, actualCard))
             {
                 index = CountSameCardsBefore(deck, id, isUpgraded, floor, i);
                 break;
@@ -100,7 +103,6 @@ public static class CardPlayStats
         ShowPlayCount = true;
         ShowHistoryPlayCount = true;
         LoadFromFile();
-        Log.Info("[CardStats] Stats initialized");
     }
 
     public static void Reset()
@@ -109,26 +111,22 @@ public static class CardPlayStats
         _combatBackup = null;
         _currentRunStartTime = 0;
         DeleteSaveFile();
-        Log.Info("[CardStats] Stats reset for new run");
     }
 
     public static void SetRunStartTime(long startTime)
     {
         _currentRunStartTime = startTime;
-        Log.Info($"[CardStats] Set run start time: {startTime}");
     }
 
     public static void OnCombatSetUp()
     {
         _combatBackup = new Dictionary<string, int>(_playCounts);
-        Log.Info($"[CardStats] Combat started, backed up {_combatBackup.Count} entries");
     }
 
     public static void OnCombatEnded()
     {
         _combatBackup = null;
         SaveToFile();
-        Log.Info("[CardStats] Combat ended, cleared backup and saved");
     }
 
     public static void RestoreFromBackup()
@@ -138,7 +136,6 @@ public static class CardPlayStats
             _playCounts = new Dictionary<string, int>(_combatBackup);
             _combatBackup = null;
             SaveToFile();
-            Log.Info($"[CardStats] Restored {_playCounts.Count} entries from backup and saved");
         }
     }
 
@@ -179,7 +176,6 @@ public static class CardPlayStats
             
             var json = JsonSerializer.Serialize(history);
             File.WriteAllText(HistoryPath, json);
-            Log.Info($"[CardStats] Saved history for run {_currentRunStartTime}, {cardStats.Count} card types");
         }
         catch (Exception ex)
         {
@@ -189,17 +185,13 @@ public static class CardPlayStats
 
     public static Dictionary<string, int> GetHistoryStats(long startTime)
     {
-        Log.Info($"[CardStats] GetHistoryStats: startTime={startTime}");
         try
         {
             var history = LoadHistoryFile();
-            Log.Info($"[CardStats] GetHistoryStats: history has {history.Count} runs");
             if (history.TryGetValue(startTime.ToString(), out var stats))
             {
-                Log.Info($"[CardStats] GetHistoryStats: found stats with {stats.Count} entries");
                 return stats;
             }
-            Log.Info($"[CardStats] GetHistoryStats: startTime not found in history");
         }
         catch (Exception ex)
         {
@@ -214,39 +206,25 @@ public static class CardPlayStats
         if (deckCard == null) return 0;
         
         var key = $"{deckCard.Id.ToString()}{Separator}{deckCard.IsUpgraded}";
-        Log.Info($"[CardStats] GetHistoryPlayCount: key={key}, stats count={stats.Count}");
-        var result = stats.TryGetValue(key, out var count) ? count : 0;
-        Log.Info($"[CardStats] GetHistoryPlayCount: result={result}");
-        return result;
+        return stats.TryGetValue(key, out var count) ? count : 0;
     }
 
     public static void RecordPlay(CardModel card)
     {
         var deckCard = GetDeckCard(card);
-        if (deckCard == null)
-        {
-            Log.Info($"[CardStats] RecordPlay: deckCard is null for {card?.Id}");
-            return;
-        }
+        if (deckCard == null) return;
         
-        if (!IsCardInDeck(deckCard))
-        {
-            Log.Info($"[CardStats] RecordPlay: {deckCard.Id} not in deck");
-            return;
-        }
+        if (!IsCardInDeck(deckCard)) return;
         
         var key = GetCardKey(deckCard);
-        Log.Info($"[CardStats] RecordPlay: key={key}");
         
         if (_playCounts.ContainsKey(key))
         {
             _playCounts[key]++;
-            Log.Info($"[CardStats] RecordPlay: incremented to {_playCounts[key]}");
         }
         else
         {
             _playCounts[key] = 1;
-            Log.Info($"[CardStats] RecordPlay: set to 1");
         }
     }
 
@@ -262,7 +240,6 @@ public static class CardPlayStats
                 return true;
             }
         }
-        Log.Info($"[CardStats] IsCardInDeck: card {card.Id} not found by ReferenceEquals");
         return false;
     }
 
@@ -285,7 +262,6 @@ public static class CardPlayStats
             
             var json = JsonSerializer.Serialize(_playCounts);
             File.WriteAllText(SavePath, json);
-            Log.Info($"[CardStats] Saved {_playCounts.Count} entries");
         }
         catch (Exception ex)
         {
@@ -301,7 +277,6 @@ public static class CardPlayStats
             {
                 var json = File.ReadAllText(SavePath);
                 _playCounts = JsonSerializer.Deserialize<Dictionary<string, int>>(json) ?? new Dictionary<string, int>();
-                Log.Info($"[CardStats] Loaded {_playCounts.Count} entries");
             }
         }
         catch (Exception ex)
@@ -318,7 +293,6 @@ public static class CardPlayStats
             if (File.Exists(SavePath))
             {
                 File.Delete(SavePath);
-                Log.Info("[CardStats] Deleted save file");
             }
         }
         catch (Exception ex)
@@ -342,5 +316,161 @@ public static class CardPlayStats
             Log.Error($"[CardStats] Failed to load history file: {ex.Message}");
         }
         return new Dictionary<string, Dictionary<string, int>>();
+    }
+
+    public static bool HasPlayCount(string key)
+    {
+        return _playCounts.ContainsKey(key);
+    }
+
+    public static int GetPlayCountByKey(string key)
+    {
+        return _playCounts.TryGetValue(key, out var count) ? count : 0;
+    }
+
+    public static void SetPlayCountByKey(string key, int count)
+    {
+        _playCounts[key] = count;
+    }
+
+    public static void RemovePlayCountByKey(string key)
+    {
+        _playCounts.Remove(key);
+    }
+
+    public static void StorePendingUpgrade(CardModel card, string key, int count)
+    {
+        _pendingUpgrades[card] = (key, count);
+    }
+
+    public static (string key, int count) GetAndClearPendingUpgradeForCard(CardModel card)
+    {
+        if (_pendingUpgrades.TryGetValue(card, out var result))
+        {
+            _pendingUpgrades.Remove(card);
+            return result;
+        }
+        
+        return ("", 0);
+    }
+
+    public static void RebuildKeysAfterRemoval()
+    {
+        var deck = GetDeck();
+        if (deck == null) return;
+        
+        var oldCounts = new Dictionary<string, int>(_playCounts);
+        _playCounts.Clear();
+        
+        var cardGroups = new Dictionary<string, List<int>>();
+        
+        foreach (var kvp in oldCounts)
+        {
+            var parts = kvp.Key.Split(Separator);
+            if (parts.Length >= 4)
+            {
+                var baseKey = $"{parts[0]}{Separator}{parts[1]}{Separator}{parts[2]}";
+                var index = int.Parse(parts[3]);
+                
+                if (!cardGroups.ContainsKey(baseKey))
+                {
+                    cardGroups[baseKey] = new List<int>();
+                }
+                while (cardGroups[baseKey].Count <= index)
+                {
+                    cardGroups[baseKey].Add(0);
+                }
+                cardGroups[baseKey][index] = kvp.Value;
+            }
+        }
+        
+        var newCardGroups = new Dictionary<string, int>();
+        
+        for (int i = 0; i < deck.Count; i++)
+        {
+            var card = deck[i];
+            var baseKey = $"{card.Id}{Separator}{card.IsUpgraded}{Separator}{card.FloorAddedToDeck ?? 0}";
+            
+            if (!newCardGroups.ContainsKey(baseKey))
+            {
+                newCardGroups[baseKey] = 0;
+            }
+            
+            var newIndex = newCardGroups[baseKey];
+            newCardGroups[baseKey]++;
+            
+            if (cardGroups.TryGetValue(baseKey, out var counts) && newIndex < counts.Count)
+            {
+                var newKey = $"{baseKey}{Separator}{newIndex}";
+                _playCounts[newKey] = counts[newIndex];
+            }
+        }
+    }
+
+    public static void PrepareForRemoval(IReadOnlyList<CardModel> cardsToRemove)
+    {
+        _pendingRemoval.Clear();
+        
+        var deck = GetDeck();
+        if (deck == null) return;
+        
+        var toRemoveSet = new HashSet<CardModel>();
+        foreach (var card in cardsToRemove)
+        {
+            if (card == null) continue;
+            var actualCard = card.DeckVersion ?? card;
+            toRemoveSet.Add(actualCard);
+        }
+        
+        foreach (var card in deck)
+        {
+            var key = GetCardKey(card);
+            if (_playCounts.TryGetValue(key, out var count))
+            {
+                _pendingRemoval[card] = count;
+            }
+        }
+        
+        foreach (var card in toRemoveSet)
+        {
+            _pendingRemoval.Remove(card);
+        }
+        
+        _playCounts.Clear();
+    }
+
+    public static void FinalizeRemoval()
+    {
+        var deck = GetDeck();
+        if (deck == null)
+        {
+            _pendingRemoval.Clear();
+            return;
+        }
+        
+        _playCounts.Clear();
+        
+        var cardGroups = new Dictionary<string, int>();
+        
+        foreach (var card in deck)
+        {
+            var baseKey = $"{card.Id}{Separator}{card.IsUpgraded}{Separator}{card.FloorAddedToDeck ?? 0}";
+            
+            if (!cardGroups.ContainsKey(baseKey))
+            {
+                cardGroups[baseKey] = 0;
+            }
+            
+            var index = cardGroups[baseKey];
+            cardGroups[baseKey]++;
+            
+            if (_pendingRemoval.TryGetValue(card, out var count))
+            {
+                var key = $"{baseKey}{Separator}{index}";
+                _playCounts[key] = count;
+            }
+        }
+        
+        _pendingRemoval.Clear();
     }
 }

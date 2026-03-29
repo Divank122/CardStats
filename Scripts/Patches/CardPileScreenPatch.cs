@@ -99,7 +99,6 @@ public partial class PilePlayCountClickHandler : HBoxContainer
             _lastShowState = CardPlayStats.ShowPilePlayCount;
             _isTicked = _lastShowState;
             UpdateVisuals();
-            UpdateAllLabels();
         }
     }
 
@@ -111,7 +110,6 @@ public partial class PilePlayCountClickHandler : HBoxContainer
             _lastShowState = _isTicked;
             CardPlayStats.ShowPilePlayCount = _isTicked;
             UpdateVisuals();
-            UpdateAllLabels();
             AcceptEvent();
         }
     }
@@ -122,20 +120,5 @@ public partial class PilePlayCountClickHandler : HBoxContainer
             _tickedImage.Visible = _isTicked;
         if (_notTickedImage != null)
             _notTickedImage.Visible = !_isTicked;
-    }
-
-    private static void UpdateAllLabels()
-    {
-        var sceneTree = Engine.GetMainLoop() as SceneTree;
-        if (sceneTree == null) return;
-        
-        var labels = sceneTree.GetNodesInGroup("pile_play_count_label");
-        foreach (var node in labels)
-        {
-            if (node is MegaLabel label)
-            {
-                label.Visible = CardPlayStats.ShowPilePlayCount;
-            }
-        }
     }
 }

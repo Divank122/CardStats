@@ -26,5 +26,8 @@
     <Message Text="Copying mod to Slay the Spire 2 mods folder..." Importance="high" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(Sts2Dir)\mods\$(MSBuildProjectName)\" />
     <Copy SourceFiles="$(MSBuildProjectName).json" DestinationFolder="$(Sts2Dir)\mods\$(MSBuildProjectName)\" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)release\" />
+    <Copy SourceFiles="$(MSBuildProjectName).json" DestinationFolder="$(ProjectDir)release\" />
+    <Copy SourceFiles="$(ProjectDir)cardstats.pck" DestinationFolder="$(ProjectDir)release\" Condition="Exists('$(ProjectDir)cardstats.pck')" />
   </Target>
 </Project>
