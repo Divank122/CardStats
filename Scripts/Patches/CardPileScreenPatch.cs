@@ -62,7 +62,7 @@ public partial class PilePlayCountClickHandler : HBoxContainer
 
         var label = new MegaLabel();
         label.Name = "PilePlayCountLabel";
-        label.Text = "查看打出次数";
+        label.Text = "查看卡牌统计";
         label.AddThemeColorOverride("font_color", new Color(0.937255f, 0.784314f, 0.317647f));
         label.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.501961f));
         label.AddThemeConstantOverride("outline_size", 12);

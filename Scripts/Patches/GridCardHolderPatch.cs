@@ -104,7 +104,7 @@ public partial class CardStatsClickHandler : HBoxContainer
 
         var label = new MegaLabel();
         label.Name = "PlayCountLabel";
-        label.Text = "查看打出次数";
+        label.Text = "查看卡牌统计";
         label.AddThemeColorOverride("font_color", new Color(0.937255f, 0.784314f, 0.317647f));
         label.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.501961f));
         label.AddThemeConstantOverride("outline_size", 12);
